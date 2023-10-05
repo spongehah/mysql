@@ -3180,13 +3180,327 @@ mysql> insert into t values(30,10,30);
 
 
 
+# 22 讲MySQL有哪些“饮鸩止渴”提高性能的方法
+
+## 短连接风暴
+
+正常的短连接模式就是连接到数据库后，执行很少的SQL语句就断开，下次需要的时候再重连。如果使用的是短连接，在业务高峰期的时候，就可能出现连接数突然暴涨的情况。
+
+我在第1篇文章[《基础架构：一条SQL查询语句是如何执行的？》](https://time.geekbang.org/column/article/68319)中说过，MySQL建立连接的过程，成本是很高的。除了正常的网络连接三次握手外，还需要做登录权限判断和获得这个连接的数据读写权限。
+
+在数据库压力比较小的时候，这些额外的成本并不明显。
+
+碰到这种情况时，一个比较自然的想法，就是调高max_connections的值。但这样做是有风险的。因为设计max_connections这个参数的目的是想保护MySQL，如果我们把它改得太大，让更多的连接都可以进来，那么系统的负载可能会进一步加大，大量的资源耗费在权限验证等逻辑上，结果可能是适得其反，已经连接的线程拿不到CPU资源去执行业务的SQL请求。
+
+那么这种情况下，你还有没有别的建议呢？我这里还有两种方法，但要注意，这些方法都是有损的。
 
 
 
+### 第一种方法：先处理掉那些占着连接但是不工作的线程。
+
+但是需要注意，在show processlist的结果里，踢掉显示为sleep的线程，可能是有损的
+
+我们来看下面这个例子。
+
+![img](image/MySQL(6)实战45讲笔记.assets/9091ff280592c8c68665771b1516c62a.png)
+
+图1 sleep线程的两种状态
+
+在上面这个例子里，如果断开session A的连接，因为这时候session A还没有提交，所以MySQL只能按照回滚事务来处理；而断开session B的连接，就没什么大影响。所以，如果按照优先级来说，你应该**优先断开像session B**这样的事务外空闲的连接。
+
+但是，怎么判断哪些是事务外空闲的呢？session C在T时刻之后的30秒执行show processlist，看到的结果是这样的。
+
+![img](image/MySQL(6)实战45讲笔记.assets/ae6a9ceecf8517e47f9ebfc565f0f925.png)
+
+图2 sleep线程的两种状态，show processlist结果
+
+图中id=4和id=5的两个会话都是Sleep 状态。而要看事务具体状态的话，你可以查information_schema库的innodb_trx表。
+
+![img](image/MySQL(6)实战45讲笔记.assets/ca4b455c8eacbf32b98d1fe9ed9876e8.png)
+
+图3 从information_schema.innodb_trx查询事务状态
+
+这个结果里，trx_mysql_thread_id=4，表示id=4的线程还处在事务中。
+
+因此，如果是连接数过多，你可以优先断开事务外空闲太久的连接；如果这样还不够，再考虑断开事务内空闲太久的连接。
+
+从服务端断开连接使用的是**kill connection + id**的命令， 一个客户端处于sleep状态时，它的连接被服务端主动断开后，这个客户端并不会马上知道。直到客户端在发起下一个请求的时候，才会收到这样的报错“ERROR 2013 (HY000): Lost connection to MySQL server during query”。
+
+从数据库端主动断开连接可能是有损的，尤其是有的应用端收到这个错误后，不重新连接，而是直接用这个已经不能用的句柄重试查询。这会导致从应用端看上去，“MySQL一直没恢复”。
 
 
 
+### 第二种方法：减少连接过程的消耗（不推荐）
 
+有的业务代码会在短时间内先大量申请数据库连接做备用，如果现在数据库确认是被连接行为打挂了，那么一种可能的做法，是让数据库跳过权限验证阶段。
+
+跳过权限验证的方法是：重启数据库，并使用**–skip-grant-tables**参数启动。这样，整个MySQL会跳过所有的权限验证阶段，包括连接过程和语句执行过程在内。
+
+但是，这种方法特别符合我们标题里说的“饮鸩止渴”，**风险极高，是我特别不建议使用的方案**。尤其你的库外网可访问的话，就更不能这么做了。
+
+**在MySQL 8.0版本里，如果你启用–skip-grant-tables参数，MySQL会默认把 --skip-networking参数打开，**表示这时候数据库只能被本地的客户端连接。可见，MySQL官方对skip-grant-tables这个参数的安全问题也很重视。
+
+除了短连接数暴增可能会带来性能问题外，实际上，我们在线上碰到更多的是查询或者更新语句导致的性能问题。其中，查询问题比较典型的有两类，一类是由新出现的慢查询导致的，一类是由QPS（每秒查询数）突增导致的。而关于更新语句导致的性能问题，我会在下一篇文章和你展开说明。
+
+
+
+## 慢查询性能问题
+
+在MySQL中，会引发性能问题的慢查询，大体有以下三种可能：
+
+1. 索引没有设计好；
+2. SQL语句没写好；
+3. MySQL选错了索引。
+
+接下来，我们就具体分析一下这三种可能，以及对应的解决方案。
+
+### 索引没有设计好
+
+**导致慢查询的第一种可能是，索引没有设计好。**
+
+这种场景一般就是通过紧急创建索引来解决。MySQL 5.6版本以后，创建索引都支持Online DDL了，对于那种高峰期数据库已经被这个语句打挂了的情况，最高效的做法就是直接执行alter table 语句。
+
+比较理想的是能够在备库先执行。假设你现在的服务是一主一备，主库A、备库B，这个方案的大致流程是这样的：
+
+1. 在备库B上执行 set sql_log_bin=off，也就是不写binlog，然后执行alter table 语句加上索引；
+2. 执行主备切换；
+3. 这时候主库是B，备库是A。在A上执行 set sql_log_bin=off，然后执行alter table 语句加上索引。
+
+这是一个“古老”的DDL方案。平时在做变更的时候，你应该考虑类似gh-ost这样的方案，更加稳妥。但是在需要紧急处理时，上面这个方案的效率是最高的。
+
+### SQL语句没写好
+
+**导致慢查询的第二种可能是，语句没写好。**
+
+比如，我们犯了在第18篇文章[《为什么这些SQL语句逻辑相同，性能却差异巨大？》](https://time.geekbang.org/column/article/74059)中提到的那些错误，导致语句没有使用上索引。
+
+这时，我们可以通过改写SQL语句来处理。MySQL 5.7提供了**query_rewrite**功能，可以把输入的一种语句改写成另外一种模式。
+
+比如，语句被错误地写成了 select * from t where id + 1 = 10000，你可以通过下面的方式，增加一个语句改写规则。
+
+```
+mysql> insert into query_rewrite.rewrite_rules(pattern, replacement, pattern_database) values ("select * from t where id + 1 = ?", "select * from t where id = ? - 1", "db1");
+
+call query_rewrite.flush_rewrite_rules();
+```
+
+这里，call query_rewrite.flush_rewrite_rules()这个存储过程，是让插入的新规则生效，也就是我们说的“查询重写”。你可以用图4中的方法来确认改写规则是否生效。
+
+![img](https://static001.geekbang.org/resource/image/47/8a/47a1002cbc4c05c74841591d20f7388a.png)
+
+图4 查询重写效果
+
+### MySQL选错索引
+
+**导致慢查询的第三种可能，就是碰上了我们在第10篇文章**[**《MySQL为什么有时候会选错索引？》**](https://time.geekbang.org/column/article/71173)**中提到的情况，MySQL选错了索引。**
+
+这时候，应急方案就是给这个语句加上**force index**。
+
+同样地，使用查询重写功能，给原来的语句加上force index，也可以解决这个问题。
+
+上面我和你讨论的由慢查询导致性能问题的三种可能情况，实际上出现最多的是前两种，即：索引没设计好和语句没写好。而这两种情况，恰恰是完全可以避免的。比如，通过下面这个过程，我们就可以预先发现问题。
+
+1. 上线前，在测试环境，把慢查询日志（slow log）打开，并且把long_query_time设置成0，确保每个语句都会被记录入慢查询日志；
+2. 在测试表里插入模拟线上的数据，做一遍回归测试；
+3. 观察慢查询日志里每类语句的输出，特别留意Rows_examined字段是否与预期一致。（我们在前面文章中已经多次用到过Rows_examined方法了，相信你已经动手尝试过了。如果还有不明白的，欢迎给我留言，我们一起讨论）。
+
+不要吝啬这段花在上线前的“额外”时间，因为这会帮你省下很多故障复盘的时间。
+
+如果新增的SQL语句不多，手动跑一下就可以。而如果是新项目的话，或者是修改了原有项目的 表结构设计，全量回归测试都是必要的。这时候，你需要工具帮你检查所有的SQL语句的返回结果。比如，你可以使用开源工具pt-query-digest(https://www.percona.com/doc/percona-toolkit/3.0/pt-query-digest.html)。
+
+
+
+## QPS突增问题
+
+有时候由于业务突然出现高峰，或者应用程序bug，导致某个语句的QPS突然暴涨，也可能导致MySQL压力过大，影响服务。
+
+我之前碰到过一类情况，是由一个新功能的bug导致的。当然，最理想的情况是让业务把这个功能下掉，服务自然就会恢复。
+
+而下掉一个功能，如果从数据库端处理的话，对应于不同的背景，有不同的方法可用。我这里再和你展开说明一下。
+
+1. 一种是由全新业务的bug导致的。假设你的DB运维是比较规范的，也就是说白名单是一个个加的。这种情况下，如果你能够确定业务方会下掉这个功能，只是时间上没那么快，那么就可以从数据库端直接**把白名单去掉**。
+2. 如果这个新功能使用的是单独的数据库用户，可以用管理员账号**把这个用户删掉**，然后断开现有连接。这样，这个新功能的连接不成功，由它引发的QPS就会变成0。
+3. 如果这个新增的功能跟主体功能是部署在一起的，那么我们只能通过处理语句来限制。这时，我们可以使用上面提到的查询重写功能，把压力最大的SQL语句直接**重写成"select 1"返回**。（不推荐）
+
+当然，这个操作的风险很高，需要你特别细致。它可能存在两个副作用：
+
+1. 如果别的功能里面也用到了这个SQL语句模板，会有误伤；
+2. 很多业务并不是靠这一个语句就能完成逻辑的，所以如果单独把这一个语句以select 1的结果返回的话，可能会导致后面的业务逻辑一起失败。
+
+所以，方案3是用于止血的，跟前面提到的去掉权限验证一样，应该是你所有选项里优先级最低的一个方案。
+
+同时你会发现，**其实方案1和2都要依赖于规范的运维体系：虚拟化、白名单机制、业务账号分离。由此可见，更多的准备，往往意味着更稳定的系统。**
+
+
+
+# 23 redo log和bon log持久化机制
+
+
+
+## binlog的写入机制
+
+其实，binlog的写入逻辑比较简单：事务执行过程中，先把日志写到binlog cache，事务提交的时候，再把binlog cache写到binlog文件中。
+
+一个事务的binlog是不能被拆开的，因此不论这个事务多大，也要确保一次性写入。这就涉及到了binlog cache的保存问题。
+
+系统给**binlog cache（默认32K）**分配了一片内存，每个线程一个，参数 binlog_cache_size用于控制单个线程内binlog cache所占内存的大小。如果超过了这个参数规定的大小，就要暂存到磁盘。
+
+事务提交的时候，执行器把binlog cache里的完整事务写入到binlog中，并清空binlog cache。状态如图1所示。
+
+![img](image/MySQL(6)实战45讲笔记.assets/9ed86644d5f39efb0efec595abb92e3e.png)
+
+​							图1 binlog写盘状态
+
+可以看到，**每个线程有自己binlog cache**，但是**共用同一份binlog文件**。
+
+- 图中的write，指的就是指把日志写入到文件系统的page cache，并没有把数据持久化到磁盘，所以速度比较快。
+- 图中的fsync，才是将数据持久化到磁盘的操作。一般情况下，我们认为fsync才占磁盘的IOPS。
+
+write 和fsync的时机，是由参数sync_binlog控制的：
+
+1. **sync_binlog=0**的时候，表示每次提交事务都只write，不fsync；
+2. **sync_binlog=1**的时候，表示每次提交事务都会执行fsync；
+3. **sync_binlog=N(N>1)**的时候，表示每次提交事务都write，但累积N个事务后才fsync。
+
+因此，在出现IO瓶颈的场景里，将sync_binlog设置成一个比较大的值，可以提升性能。在实际的业务场景中，考虑到丢失日志量的可控性，一般不建议将这个参数设成0，比较常见的是将其设置为**100~1000**中的某个数值。
+
+但是，将sync_binlog设置为N，对应的风险是：如果主机发生异常重启，会**丢失最近N个事务的binlog日志**。
+
+## redo log的写入机制
+
+接下来，我们再说说redo log的写入机制。
+
+在专栏的[第15篇答疑文章](https://time.geekbang.org/column/article/73161)中，我给你介绍了redo log buffer。事务在执行过程中，生成的redo log是要先写到redo log buffer的。
+
+> 然后就有同学问了，redo log buffer里面的内容，是不是每次生成后都要直接持久化到磁盘呢？
+>
+> 答案是，不需要。
+>
+> 如果事务执行期间MySQL发生异常重启，那这部分日志就丢了。由于事务并没有提交，所以这时日志丢了也不会有损失。
+>
+> 那么，另外一个问题是，事务还没提交的时候，redo log buffer中的部分日志有没有可能被持久化到磁盘呢？
+>
+> 答案是，确实会有。
+
+这个问题，要从redo log可能存在的三种状态说起。这三种状态，对应的就是图2 中的三个颜色块。
+
+![img](image/MySQL(6)实战45讲笔记.assets/9d057f61d3962407f413deebc80526d4.png)
+
+​								图2 MySQL redo log存储状态
+
+这三种状态分别是：
+
+1. 存在redo log buffer中，物理上是在MySQL进程内存中，就是图中的红色部分；
+2. 写到磁盘(write)，但是没有持久化（fsync)，物理上是在文件系统的page cache里面，也就是图中的黄色部分；
+3. 持久化到磁盘，对应的是hard disk，也就是图中的绿色部分。
+
+日志写到redo log buffer是很快的，wirte到page cache也差不多，但是持久化到磁盘的速度就慢多了。
+
+为了控制redo log的写入策略，InnoDB提供了innodb_flush_log_at_trx_commit参数，它有三种可能取值：
+
+1. **设置为0的时候**，表示每次事务提交时都只是把redo log留在redo log buffer中;
+2. **设置为1的时候**，表示每次事务提交时都将redo log直接持久化到磁盘；
+3. **设置为2的时候**，表示每次事务提交时都只是把redo log写到page cache。
+
+**InnoDB有一个后台线程，每隔1秒，就会把redo log buffer中的日志**，调用write写到文件系统的page cache，然后调用fsync持久化到磁盘。
+
+注意，事务执行中间过程的redo log也是直接写在redo log buffer中的，这些redo log也会被后台线程一起持久化到磁盘。也就是说，一个没有提交的事务的redo log，也是可能已经持久化到磁盘的。
+
+实际上，除了后台线程每秒一次的轮询操作外，还有两种场景会让一个没有提交的事务的redo log写入到磁盘中。
+
+1. **一种是，redo log buffer占用的空间即将达到 innodb_log_buffer_size一半的时候，后台线程会主动写盘。**注意，由于这个事务并没有提交，所以这个写盘动作只是write，而没有调用fsync，也就是只留在了文件系统的page cache。
+2. **另一种是，并行的事务提交的时候，顺带将这个事务的redo log buffer持久化到磁盘。**假设一个事务A执行到一半，已经写了一些redo log到buffer中，这时候有另外一个线程的事务B提交，如果innodb_flush_log_at_trx_commit设置的是1，那么按照这个参数的逻辑，事务B要把redo log buffer里的日志全部持久化到磁盘。这时候，就会带上事务A在redo log buffer里的日志一起持久化到磁盘。
+
+这里需要说明的是，我们介绍两阶段提交的时候说过，时序上redo log先prepare， 再写binlog，最后再把redo log commit。
+
+如果把innodb_flush_log_at_trx_commit设置成1，那么redo log在prepare阶段就要持久化一次，因为有一个崩溃恢复逻辑是要依赖于prepare 的redo log，再加上binlog来恢复的。（如果你印象有点儿模糊了，可以再回顾下[第15篇文章](https://time.geekbang.org/column/article/73161)中的相关内容）。
+
+每秒一次后台轮询刷盘，再加上崩溃恢复这个逻辑，InnoDB就认为redo log在commit的时候就不需要fsync了，只会write到文件系统的page cache中就够了。
+
+通常我们说MySQL的“双1”配置，指的就是sync_binlog和innodb_flush_log_at_trx_commit都设置成 1。也就是说，一个事务完整提交前，需要等待两次刷盘，一次是redo log（prepare 阶段），一次是binlog。
+
+### 组提交机制
+
+这时候，你可能有一个疑问，这意味着我从MySQL看到的TPS是每秒两万的话，每秒就会写四万次磁盘。但是，我用工具测试出来，磁盘能力也就两万左右，怎么能实现两万的TPS？
+
+解释这个问题，就要用到组提交（group commit）机制了。
+
+这里，我需要先和你介绍**日志逻辑序列号**（log sequence number，**LSN**）的概念。LSN是单调递增的，用来对应redo log的一个个写入点。每次写入长度为length的redo log， LSN的值就会加上length。
+
+LSN也会写到InnoDB的数据页中，来确保数据页不会被多次执行重复的redo log。关于LSN和redo log、checkpoint的关系，我会在后面的文章中详细展开。
+
+如图3所示，是三个并发事务(trx1, trx2, trx3)在prepare 阶段，都写完redo log buffer，持久化到磁盘的过程，对应的LSN分别是50、120 和160。
+
+![img](image/MySQL(6)实战45讲笔记.assets/933fdc052c6339de2aa3bf3f65b188cc.png)
+
+​							图3 redo log 组提交
+
+从图中可以看到，
+
+1. trx1是第一个到达的，会被选为这组的 **leader**；
+2. 等trx1要开始写盘的时候，这个组里面已经有了三个事务，这时候**LSN也变成了160**；
+3. trx1去写盘的时候，带的就是LSN=160，因此**等trx1返回时，所有LSN小于等于160的redo log，都已经被持久化到磁盘**；
+4. 这时候trx2和trx3就可以直接返回了。
+
+所以，一次组提交里面，组员越多，节约磁盘IOPS的效果越好。但如果只有单线程压测，那就只能老老实实地一个事务对应一次持久化操作了。
+
+在并发更新场景下，第一个事务写完redo log buffer以后，接下来这个fsync越晚调用，组员可能越多，节约IOPS的效果就越好。
+
+### 细化两阶段提交
+
+为了让一次fsync带的组员更多，MySQL有一个很有趣的优化：拖时间。在介绍两阶段提交的时候，我曾经给你画了一个图，现在我把它截过来。
+
+<img src="image/MySQL(6)实战45讲笔记.assets/image-20231005202355961.png" alt="image-20231005202355961" style="zoom:50%;" />
+
+​									图4 两阶段提交
+
+图中，我把“写binlog”当成一个动作。但实际上，写binlog是分成两步的：
+
+1. 先把binlog从binlog cache中写到磁盘上的binlog文件；
+2. 调用fsync持久化。
+
+MySQL为了让组提交的效果更好，把redo log做fsync的时间拖到了步骤1之后。也就是说，上面的图变成了这样：
+
+<img src="image/MySQL(6)实战45讲笔记.assets/image-20231005202444056.png" alt="image-20231005202444056" style="zoom:50%;" />
+
+​									图5 两阶段提交细化
+
+这么一来，binlog也可以组提交了。在执行图5中第4步把binlog fsync到磁盘时，如果有多个事务的binlog已经写完了，也是一起持久化的，这样也可以减少IOPS的消耗。
+
+
+
+### 提升binlog组提交效果
+
+不过通常情况下第3步执行得会很快，所以**binlog的write和fsync间的间隔时间短**，导致能集合到一起持久化的binlog比较少，因此binlog的组提交的效果通常不如redo log的效果那么好。
+
+如果你想**提升binlog组提交的效果**，可以通过设置 **binlog_group_commit_sync_delay** 和 **binlog_group_commit_sync_no_delay_count**来实现。
+
+1. binlog_group_commit_sync_delay参数，表示延迟多少微秒后才调用fsync;
+2. binlog_group_commit_sync_no_delay_count参数，表示累积多少次以后才调用fsync。
+
+这两个条件**是或的关系**，也就是说只要有一个满足条件就会调用fsync。
+
+所以，当binlog_group_commit_sync_delay设置为0的时候，binlog_group_commit_sync_no_delay_count也无效了。
+
+
+
+之前有同学在评论区问到，WAL机制是减少磁盘写，可是每次提交事务都要写redo log和binlog，这磁盘读写次数也没变少呀？
+
+现在你就能理解了，WAL机制主要得益于两个方面：
+
+1. redo log 和 binlog都是**顺序写**，磁盘的顺序写比随机写速度要快；
+2. **组提交机制**，可以大幅度**降低磁盘的IOPS消耗**。
+3. WAL避免了直接修改页的修改数据量和读取页的数据量严重不成比例
+
+分析到这里，我们再来回答这个问题：**如果你的MySQL现在出现了性能瓶颈，而且瓶颈在IO上，可以通过哪些方法来提升性能呢？**
+
+针对这个问题，可以考虑以下三种方法：
+
+1. 设置 binlog_group_commit_sync_delay 和 binlog_group_commit_sync_no_delay_count参数，减少binlog的写盘次数。这个方法是基于“额外的故意等待”来实现的，因此可能会增加语句的响应时间，但没有丢失数据的风险。
+2. 将sync_binlog 设置为大于1的值（比较常见是100~1000）。这样做的风险是，主机掉电时会丢binlog日志。
+3. 将innodb_flush_log_at_trx_commit设置为2。这样做的风险是，主机掉电的时候会丢数据。
+
+我不建议你把innodb_flush_log_at_trx_commit 设置成0。因为把这个参数设置成0，表示redo log只保存在内存中，这样的话MySQL本身异常重启也会丢数据，风险太大。而redo log写到文件系统的page cache的速度也是很快的，所以将这个参数设置成2跟设置成0其实性能差不多，但这样做MySQL异常重启时就不会丢数据了，相比之下风险会更小。
 
 
 
