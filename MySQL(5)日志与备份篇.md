@@ -850,6 +850,10 @@ write和fsync的时机，可以由参数 `sync_binlog` 控制，默认是 `1` �
 
 **并不会回滚事务**，它会执行上图框住的逻辑，虽然redo log是处于prepare阶段，但是**能通过事务id找到对应的binlog日志**，所以MySQL认为是完整的，就会提交事务恢复数据。
 
+> 两阶段提交还能再细化，为了提高**redolog和binlog组提交**的效果，详情请看《MySQL(6)》
+>
+> 细化为redo prepare write -> binlog write -> redo prepare fsync -> binlog fsync -> redo commit write
+
 ## 7. 中继日志(relay log)
 
 ### 7.1 介绍
@@ -916,7 +920,7 @@ CD95YCABAAAAKAAAAGgDAAAAAFsAAAAAAAEAAgAB/wABAAAAfATkBw==
 
 | 命令类别  |                                                              |
 | --------- | ------------------------------------------------------------ |
-| show      | show status like<br/>show table status like<br/>show create table<br/>show variables like<br/>show open tables<br/>show profilings<br/>show profiles<br/>show profile for query<br/>show processlist<br/>show engines<br/>show binlog events<br/>show binary logs<br/>show master status<br/>show slavef status<br/>show index from |
+| show      | show status like<br/>show engine innodb  status<br/>show table status like<br/>show create table<br/>show variables like<br/>show open tables<br/>show profilings<br/>show profiles<br/>show profile for query<br/>show processlist<br/>show engines<br/>show binlog events<br/>show binary logs<br/>show master status<br/>show slave status<br/>show index from |
 | mysql开头 | mysqldumpslow<br/>mysqlbinlog<br/>mysql<br/>mysqldump(备份)  |
 | 刷新日志  | 命令行: mysqladmin -uroot -p flush-logs<br/>flush logs       |
 | 锁监控    | show status like 'innodb_row_lock%';<br/>查询正在被锁阻塞的sql语句：SELECT * FROM information_schema.INNODB_TRX\G;<br/>查询阻塞锁情况：SELECT * FROM performance_schema.data_lock_waits\G;<br/>查询所有锁的情况：SELECT * from performance_schema.data_locks\G; |

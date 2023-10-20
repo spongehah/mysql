@@ -4839,9 +4839,15 @@ EXPLAIN SELECT SQL_NO_CACHE * FROM student WHERE age = 10 OR name = 'Abel';
 
 ### 2.12 部分and 后的索引的列，索引失效
 
-若没有使用使用and连接两个索引，将会只使用and前的索引，而不会使用and之后的索引
+若使用and连接两个索引，将会只使用and前的索引，而不会使用and之后的索引
 
 比如第9章 6.4 > 5中的index_merge案例，当使用or时type=index_merge，当使用and时，type=ref
+
+```mysql
+EXPLAIN SELECT * FROM s1 WHERE key1 = 'a' or key3 = 'a';
+```
+
+type=index_merge，而下面这中方式，type=ref
 
 ```mysql
 EXPLAIN SELECT * FROM s1 WHERE key1 = 'a' and key3 = 'a';
@@ -4849,7 +4855,11 @@ EXPLAIN SELECT * FROM s1 WHERE key1 = 'a' and key3 = 'a';
 
 ![image-20230905164318711](image/MySQL(3)索引和调优篇.assets/image-20230905164318711.png)
 
-但是本章使用的测试数据中，使用and时也是index_merge，其extra信息为：Using intersect
+
+
+一般情况下，and后的索引会失效，有几种特殊情况：Extra字段中出现的三种索引合并方式：Using intersect、Using union、Using sort_union
+
+本章使用的测试数据中，使用and时type=index_merge，其extra信息为：Using intersect(idx_cid,idx_age)，说明使用了索引idx_cid和idx_age进行intersect方式的索引合并
 
 ```mysql
 explain select * from student where age = 18 and classId = 101;
