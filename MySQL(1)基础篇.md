@@ -2,11 +2,11 @@
 
 
 
-# 基础篇
+ 基础篇
 
 
 
-## SQL通用语法及分类
+# MySQL基础篇
 
 
 
@@ -37,11 +37,11 @@
 
 
 
-## DDL（数据定义语言）
+# DDL（数据定义语言）
 
 
 
-### 数据库操作
+## 数据库操作
 
 查询所有数据库：
 
@@ -79,7 +79,7 @@ USE 数据库名;
 
 
 
-### 表操作
+## 表操作
 
 
 
@@ -173,7 +173,7 @@ TRUNCATE TABLE 表名;
 
 
 
-## DQL（数据查询语言）
+# DQL（数据查询语言）
 
 - 简单查询
 - 自连接
@@ -185,9 +185,9 @@ TRUNCATE TABLE 表名;
 
 
 
-## DML（数据操作语言）
+# DML（数据操作语言）
 
-### 添加数据
+## 添加数据
 
 指定字段：
 
@@ -215,7 +215,7 @@ INSERT INTO 表名 VALUES (值1, 值2, ...);
 
 
 
-### 更新和删除数据
+## 更新和删除数据
 
 修改数据：
 
@@ -244,7 +244,7 @@ DELETE FROM 表名 [ WHERE 条件 ];
 
 
 
-## DCL（数据控制语言）
+# DCL（数据控制语言）
 
 **登录MySQL服务器**
 
@@ -259,7 +259,7 @@ mysql –h hostname|hostIP –P port –u username –p DatabaseName –e "SQL�
 
 
 
-### 增删改用户
+## 增删改用户
 
 **创建用户**
 
@@ -342,7 +342,7 @@ SET PASSWORD FOR 'username'@'hostname'='new_password';
 
 
 
-### 权限管理
+## 权限管理
 
 **2.1权限列表**
 
@@ -396,9 +396,9 @@ GRANT ALL PRIVILEGES ON *.* TO joe@'%' IDENTIFIED BY '123';
 
 ```mysql
 SHOW GRANTS; 
-# 或 
+ 或 
 SHOW GRANTS FOR CURRENT_USER; 
-# 或 
+ 或 
 SHOW GRANTS FOR CURRENT_USER();
 ```
 
@@ -421,9 +421,9 @@ REVOKE 权限1,权限2,…权限n ON 数据库名称.表名称 FROM 用户名@�
 - 举例
 
 ```mysql
-#收回全库全表的所有权限 
+收回全库全表的所有权限 
 REVOKE ALL PRIVILEGES ON *.* FROM joe@'%'; 
-#收回mysql库下的所有表的插删改查权限 
+收回mysql库下的所有表的插删改查权限 
 REVOKE SELECT,INSERT,UPDATE,DELETE ON mysql.* FROM joe@localhost;
 ```
 
@@ -431,7 +431,7 @@ REVOKE SELECT,INSERT,UPDATE,DELETE ON mysql.* FROM joe@localhost;
 
 
 
-### 角色管理
+## 角色管理
 
 **3.1** **创建角色**
 
@@ -531,15 +531,15 @@ SET GLOBAL mandatory_roles = 'role1,role2@localhost,r3@%.example.com'; #系统�
 
 
 
-## 其它非表数据库对象
+# 其它非表数据库对象
 
 
 
-### 视图VIEW
+## 视图VIEW
 
 
 
-#### 视图的理解
+### 视图的理解
 
 视图的理解
 
@@ -553,7 +553,7 @@ SET GLOBAL mandatory_roles = 'role1,role2@localhost,r3@%.example.com'; #系统�
 
 
 
-#### 视图的优缺点
+### 视图的优缺点
 
 **优点**
 
@@ -589,7 +589,7 @@ MySQL将用户对数据的 访问限制 在某些数据的结果集上，而这�
 
 
 
-#### 创建视图
+### 创建视图
 
 
 
@@ -706,7 +706,7 @@ ON emp_dept.ename = emp_year_salary.ename;
 
 
 
-#### 查看视图
+### 查看视图
 
 语法1：查看数据库的表对象、视图对象
 
@@ -723,7 +723,7 @@ DESC/ DESCRIBE 视图名称;
 语法3：查看视图的属性信息
 
 ```mysql
-# 查看视图信息（显示数据表的存储引擎、版本、数据行数和数据大小等）
+ 查看视图信息（显示数据表的存储引擎、版本、数据行数和数据大小等）
 SHOW TABLE STATUS LIKE '视图名称'\G
 ```
 
@@ -737,7 +737,7 @@ SHOW CREATE VIEW 视图名称;
 
 
 
-#### 更新视图的数据
+### 更新视图的数据
 
 
 
@@ -841,7 +841,7 @@ mysql> INSERT INTO emp_dept(ename,salary,birthday,tel,email,hiredate,dname)
     -> VALUES('张三',15000,'1995-01-08','18201587896',
     -> 'zs@atguigu.com','2022-02-14','新部门');
     
-#ERROR 1393 (HY000): Can not modify more than one base table through a join view 'atguigu_chapter9.emp_dept'
+ERROR 1393 (HY000): Can not modify more than one base table through a join view 'atguigu_chapter9.emp_dept'
 
 ```
 
@@ -851,7 +851,7 @@ mysql> INSERT INTO emp_dept(ename,salary,birthday,tel,email,hiredate,dname)
 
 
 
-#### 修改、删除视图
+### 修改、删除视图
 
 
 
@@ -908,11 +908,11 @@ AS
 
 
 
-### 变量
+## 变量
 
 
 
-#### 系统变量
+### 系统变量
 
 系统变量 是MySQL服务器提供，不是用户定义的，属于服务器层面。
 
@@ -972,7 +972,7 @@ select @@global.autocommit;
 
 
 
-#### 用户定义变量
+### 用户定义变量
 
 用户定义变量 是用户根据需要自己定义的变量，用户变量不用提前声明，在用的时候直接用 "@变量名" 使用就可以。其作用域为当前连接。
 
@@ -1027,7 +1027,7 @@ select @abc;
 
 
 
-#### 局部变量
+### 局部变量
 
 局部变量 是根据需要定义的在局部生效的变量，访问之前，需要DECLARE声明。可用作存储过程内的局部变量和输入参数，局部变量的范围是在其内声明的BEGIN ... END块。
 
@@ -1071,7 +1071,7 @@ call p2();
 
 
 
-#### 游标
+### 游标
 
 上面的局部变量等只能接收标量，
 
@@ -1143,7 +1143,7 @@ begin
     close u_cursor;
 end;
 
-# 调用：
+ 调用：
 call p11(30);
 ```
 
@@ -1159,7 +1159,7 @@ call p11(30);
 
 
 
-#### 条件处理程序
+### 条件处理程序
 
 条件处理程序（Handler）可以用来定义在流程控制结构执行过程中遇到问题时相应的处理步骤。具体语法为：
 
@@ -1221,7 +1221,7 @@ begin
     close u_cursor;	#自动执行条件处理程序
 end;
 
-# 调用：
+ 调用：
 call p11(30);
 ```
 
@@ -1256,7 +1256,7 @@ begin
     close u_cursor;
 end;
 
-# 调用：
+ 调用：
 call p12(30);
 ```
 
@@ -1264,11 +1264,11 @@ call p12(30);
 
 
 
-### 存储过程PROCEDURE
+## 存储过程PROCEDURE
 
 
 
-#### 理解和优缺点
+### 理解和优缺点
 
 **含义**：存储过程的英文是 Stored Procedure 。它的思想很简单，就是一组经过 预先编译 的 SQL 语句的封装。
 
@@ -1304,7 +1304,7 @@ call p12(30);
 
 
 
-#### 基本语法
+### 基本语法
 
 - <font color='cornflowerblue'>创建</font>
 
@@ -1484,7 +1484,7 @@ call p12(30);
 
 
 
-### 存储函数FUNCTION
+## 存储函数FUNCTION
 
 存储函数是有返回值的存储过程，存储函数的参数**只能是IN类型的**。具体语法如下：
 
@@ -1534,7 +1534,7 @@ begin
     return total;
 end;
 
-# 调用：
+ 调用：
 select fun1(50);
 ```
 
@@ -1542,11 +1542,11 @@ select fun1(50);
 
 
 
-### 控制过程
+## 控制过程
 
 
 
-#### IF
+### IF
 
 if 用于做条件判断，具体的语法结构为：
 
@@ -1586,14 +1586,14 @@ begin
     
 end;
 
-# 调用：
+ 调用：
 call p3(18, @result);
 select @result;
 ```
 
 
 
-#### CASE
+### CASE
 
 case结构及作用，和我们在基础篇中所讲解的流程控制函数很类似。有两种语法格式：
 
@@ -1650,7 +1650,7 @@ begin
     select concat('您输入的月份为: ',month, ', 所属的季度为: ',result);
 end;
 
-# 调用：
+ 调用：
 call p6(16);
 ```
 
@@ -1658,7 +1658,7 @@ call p6(16);
 
 
 
-#### WHILE
+### WHILE
 
 while 循环是有条件的循环控制语句。满足条件后，再执行循环体中的SQL语句。具体语法为：
 
@@ -1690,13 +1690,13 @@ begin
     select total;
 end;
 
-# 调用：
+ 调用：
 call p7(100);
 ```
 
 
 
-#### REPEAT
+### REPEAT
 
 repeat是有条件的循环控制语句, 当**满足until声明的条件的时候，则退出循环** 。具体语法为：
 
@@ -1728,14 +1728,14 @@ begin
     select total;
 end;
 
-# 调用：
+ 调用：
 call p8(10);
 call p8(100);
 ```
 
 
 
-#### LOOP
+### LOOP
 
 LOOP 实现简单的循环，如果不在SQL逻辑中增加退出循环的条件，可以用其来实现简单的死循环。
 
@@ -1782,7 +1782,7 @@ begin
     select total;
 end;
 
-# 调用：
+ 调用：
 call p9(100);
 ```
 
@@ -1814,7 +1814,7 @@ begin
     select total;
 end;
 
-# 调用：
+ 调用：
 call p10(100);
 ```
 
@@ -1822,7 +1822,7 @@ call p10(100);
 
 
 
-### 触发器TRIGGER
+## 触发器TRIGGER
 
 
 
@@ -1978,11 +1978,11 @@ delete from tb_user where id = 26;
 
 
 
-## MySQL8.0新特性
+# MySQL8.0新特性
 
 
 
-### 新特性1：窗口函数
+## 新特性1：窗口函数
 
 MySQL从8.0版本开始支持窗口函数。窗口函数的作用类似于在查询中对数据进行分组，
 
@@ -2004,7 +2004,7 @@ MySQL从8.0版本开始支持窗口函数。窗口函数的作用类似于在查
 
 
 
-### 新特性2：公用表达式
+## 新特性2：公用表达式
 
 公用表表达式（或通用表表达式）简称为CTE（Common Table Expressions）。CTE是一个命名的临时结果集，作用范围是当前语句。CTE可以理解成一个可以复用的子查询，当然跟子查询还是有点区别的，CTE可以引用其他CTE，但子查询不能引用其他子查询。所以，可以考虑代替子查询。
 

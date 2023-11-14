@@ -2,6 +2,8 @@
 
 > redo log 和 undo log 在事务篇之中 
 
+# MySQL日志与备份篇
+
 # 第17章_其他数据库日志
 
 <img src="image/MySQL(5)日志与备份篇.assets/image-20220715141705004.png" alt="image-20220715141705004" style="float:left;" />

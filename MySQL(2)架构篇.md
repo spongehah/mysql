@@ -2,19 +2,19 @@
 
 
 
-# 架构篇
+ 架构篇
 
 >学习课程：B站搜尚硅谷MySQL康师傅
 >
 >author：hah
 
+# MySQL架构篇
 
-
-## Linux下MySQL的安装与使用
+# Linux下MySQL的安装与使用
 
 > 具体看尚硅谷笔记高级篇《第01章 Linux下MySQL的安装与使用》
 
-### Linux版MySQL的安装和卸载
+## Linux版MySQL的安装和卸载
 
 > 具体看尚硅谷笔记高级篇《第01章 Linux下MySQL的安装与使用》
 
@@ -24,7 +24,7 @@
 
 
 
-### 字符集的相关操作
+## 字符集的相关操作
 
 
 
@@ -83,25 +83,25 @@ utf8 字符集表示一个字符需要使用1～4个字节，但是我们常用�
 **常用操作示例：**
 
 ```mysql
-#查看GBK字符集的比较规则
+查看GBK字符集的比较规则
 SHOW COLLATION LIKE 'gbk%';
-#查看UTF-8字符集的比较规则
+查看UTF-8字符集的比较规则
 SHOW COLLATION LIKE 'utf8%';
 
-#查看服务器的字符集和比较规则
+查看服务器的字符集和比较规则
 SHOW VARIABLES LIKE '%_server';
-#查看数据库的字符集和比较规则
+查看数据库的字符集和比较规则
 SHOW VARIABLES LIKE '%_database';
-#查看具体数据库的字符集
+查看具体数据库的字符集
 SHOW CREATE DATABASE dbtest1;
-#修改具体数据库的字符集
+修改具体数据库的字符集
 ALTER DATABASE dbtest1 DEFAULT CHARACTER SET 'utf8' COLLATE 'utf8_general_ci';
 
-#查看表的字符集
+查看表的字符集
 show create table employees;
-#查看表的比较规则
+查看表的比较规则
 show table status from atguigudb like 'employees';
-#修改表的字符集和比较规则
+修改表的字符集和比较规则
 ALTER TABLE emp1 DEFAULT CHARACTER SET 'utf8' COLLATE 'utf8_general_ci';
 ```
 
@@ -113,7 +113,7 @@ ALTER TABLE emp1 DEFAULT CHARACTER SET 'utf8' COLLATE 'utf8_general_ci';
 
 
 
-### SQL大小写规范
+## SQL大小写规范
 
  
 
@@ -181,11 +181,11 @@ lower_case_table_names 设置成不同于初始化 MySQL 服务时设置的lower
 
 
 
-## MySQL的数据目录
+# MySQL的数据目录
 
 > 具体看尚硅谷笔记高级篇《第02章_MySQL的数据目录》
 
-### MySQL8的主要目录结构
+## MySQL8的主要目录结构
 
 ```shell
 find / -name mysql
@@ -209,7 +209,7 @@ show variables like 'datadir'; # /var/lib/mysql/
 
 
 
-### 数据库和表在文件系统中的表示
+## 数据库和表在文件系统中的表示
 
 
 
@@ -224,7 +224,7 @@ ll
 
 
 
-#### InnoDB存储引擎模式
+### InnoDB存储引擎模式
 
 **1.** **表结构**
 
@@ -233,14 +233,14 @@ ll
 先进入某个数据库文件，执行ll，可以看到如下结构
 
 ```shell
-# MySQL5
+ MySQL5
 -rw-r-----. 1 mysql mysql 61 8月 18 11:32 db.opt
 -rw-r-----. 1 mysql mysql 8716 8月 18 11:32 departments.frm		#表结构
 -rw-r-----. 1 mysql mysql 147456 8月 18 11:32 departments.ibd	#表数据
 -rw-r-----. 1 mysql mysql 8982 8月 18 11:32 employees.frm
 -rw-r-----. 1 mysql mysql 180224 8月 18 11:32 employees.ibd
 
-# MySQL8
+ MySQL8
 -rw-r-----. 1 mysql mysql 163840 7月 29 23:10 departments.ibd
 -rw-r-----. 1 mysql mysql 196608 7月 29 23:10 employees.ibd
 ```
@@ -292,7 +292,7 @@ innodb_file_per_table=0 # 0：代表使用系统表空间； 1：代表使用独
 
 
 
-#### MyISAM存储引擎模式
+### MyISAM存储引擎模式
 
 **1.** **表结构**
 
@@ -316,7 +316,7 @@ test.MYI 存储索引 (MYIndex)
 
 
 
-#### 小结
+### 小结
 
 举例： 数据库a ， 表b 。
 
@@ -346,13 +346,13 @@ test.MYI 存储索引 (MYIndex)
 
 
 
-## MySQL逻辑架构
+# MySQL逻辑架构
 
 
 
-### 1. 逻辑架构剖析
+## 1. 逻辑架构剖析
 
-#### 1.1 服务器处理客户端请求
+### 1.1 服务器处理客户端请求
 
 
 
@@ -374,7 +374,7 @@ test.MYI 存储索引 (MYIndex)
 
 
 
-#### 1.2 Connectors
+### 1.2 Connectors
 
 Connectors, 指的是不同语言中与SQL的交互。MySQL首先是一个网络程序，在TCP之上定义了自己的应用层协议。所以要使用MySQL，我们可以编写代码，跟MySQL Server `建立TCP连接`，之后按照其定义好的协议进行交互。或者比较方便的方法是调用SDK，比如Native C API、JDBC、PHP等各语言MySQL Connecotr,或者通过ODBC。但**通过SDK来访问MySQL，本质上还是在TCP连接上通过MySQL协议跟MySQL进行交互**
 
@@ -382,7 +382,7 @@ Connectors, 指的是不同语言中与SQL的交互。MySQL首先是一个网络
 
 
 
-#### 1.3 第一层：连接层
+### 1.3 第一层：连接层
 
 系统（客户端）访问 MySQL 服务器前，做的第一件事就是建立 TCP 连接。 经过三次握手建立连接成功后， MySQL 服务器对 TCP 传输过来的账号密码做身份认证、权限获取。
 
@@ -393,7 +393,7 @@ TCP 连接收到请求后，必须要分配给一个线程专门与这个客户�
 
 所以**连接管理**的职责是负责认证、管理连接、获取权限信息。
 
-#### 1.4 第二层：服务层
+### 1.4 第二层：服务层
 
 第二层架构主要完成大多数的核心服务功能，如SQL接口，并完成`缓存的查询`，SQL的分析和优化及部分内置函数的执行。所有跨存储引擎的功能也在这一层实现，如过程、函数等。
 
@@ -431,7 +431,7 @@ TCP 连接收到请求后，必须要分配给一个线程专门与这个客户�
   - 这个缓存机制是由一系列小缓存组成的。比如表缓存，记录缓存，key缓存，权限缓存等 。 这个查询缓存可以在 不同客户端之间共享 。
   - 从MySQL 5.7.20开始，不推荐使用查询缓存，并在 MySQL 8.0中删除 。
 
-#### 1.5 第三层：引擎层
+### 1.5 第三层：引擎层
 
 插件式存储引擎层（ Storage Engines），**真正的负责了MySQL中数据的存储和提取，对物理服务器级别维护的底层数据执行操作**，服务器通过API与存储引擎进行通信。不同的存储引擎具有的功能不同，这样 我们可以根据自己的实际需要进行选取。
 
@@ -439,11 +439,11 @@ MySQL 8.0.25默认支持的存储引擎如下：
 
 [![image-20220615140556893](image/MySQL(2)架构篇.assets/image-20220615140556893.png)](https://github.com/codinglin/StudyNotes/blob/main/MySQL高级篇/MySQL架构篇.assets/image-20220615140556893.png)
 
-#### 1.6 存储层
+### 1.6 存储层
 
 所有的数据，数据库、表的定义，表的每一行的内容，索引，都是存在文件系统 上，以`文件`的方式存在的，并完成与存储引擎的交互。当然有些存储引擎比如InnoDB，也支持不使用文件系统直接管理裸设备，但现代文件系统的实现使得这样做没有必要了。在文件系统之下，可以使用本地磁盘，可以使用 DAS、NAS、SAN等各种存储系统。
 
-#### 1.7 小结
+### 1.7 小结
 
 MySQL架构图本节开篇所示。下面为了熟悉SQL执行流程方便，我们可以简化如下：
 
@@ -457,15 +457,15 @@ MySQL架构图本节开篇所示。下面为了熟悉SQL执行流程方便，我
 
 
 
-### 2. SQL执行流程
+## 2. SQL执行流程
 
-#### 2.1 MySQL中的SQL执行流程
+### 2.1 MySQL中的SQL执行流程
 
 [![image-20220615141934531](image/MySQL(2)架构篇.assets/image-20220615141934531.png)](https://github.com/codinglin/StudyNotes/blob/main/MySQL高级篇/MySQL架构篇.assets/image-20220615141934531.png)
 
 **MySQL的查询流程：**
 
-##### 1) 查询缓存
+#### 1) 查询缓存
 
 - **(1) 查询缓存**：Server 如果在查询缓存中发现了这条 SQL 语句，就会直接将结果返回给客户端；如果没 有，就进入到解析器阶段。需要说明的是，因为查询缓存往往效率不高，所以在 MySQL8.0 之后就抛弃了这个功能。5.7中默认关闭
 
@@ -495,7 +495,7 @@ MySQL拿到一个查询请求后，会先到查询缓存看看，之前是不是
 一般建议大家在静态表里使用查询缓存，什么叫`静态表`呢？就是一般我们极少更新的表。比如，一个系统配置表、字典表，这张表上的查询才适合使用查询缓存。好在MySQL也提供了这种“`按需使用`”的方式。你可以将 my.cnf 参数 query_cache_type 设置成 DEMAND，代表当 sql 语句中有 SQL_CACHE关键字时才缓存。比如：
 
 ```mysql
-# query_cache_type 有3个值。 0代表关闭查询缓存OFF，1代表开启ON，2代表(DEMAND)
+ query_cache_type 有3个值。 0代表关闭查询缓存OFF，1代表开启ON，2代表(DEMAND)
 query_cache_type=2
 ```
 
@@ -514,7 +514,7 @@ SQl_NO_CACHE为不使用
 查看当前 mysql 实例是否开启缓存机制
 
 ```
-# MySQL5.7中：
+ MySQL5.7中：
 show global variables like "%query_cache_type%";
 ```
 
@@ -548,7 +548,7 @@ show status like '%Qcache%';
 >
 > `Qcache_total_blocks`: 当前缓存的block数量。
 
-##### 2) 解析器
+#### 2) 解析器
 
 - **(2) 解析器**：在解析器中对 SQL 语句进行语法分析、语义分析。
 
@@ -580,7 +580,7 @@ select department_id,job_id, avg(salary) from employees group by department_id;
 
 至此解析器的工作任务也基本圆满了。
 
-##### 3) 优化器
+#### 3) 优化器
 
 - **(3) 优化器**：在优化器中会确定 SQL 语句的执行路径，比如是根据 `全表检索` ，还是根据 `索引检索` 等。
 
@@ -617,7 +617,7 @@ where test1.name='zhangwei' and test2.name='mysql高级课程';
 
 物理查询优化是基于关系代数进行的查询重写，而关系代数的每一步都对应着物理计算，这些物理计算往往存在多种算法，因此需要计算各种物理路径的代价，从中选择代价最小的作为执行计划。在这个阶段里，对于单表和多表连接的操作，需要高效地`使用索引`，提升查询效率。
 
-##### 4) 执行器
+#### 4) 执行器
 
 - **(4) 执行器**：
 
@@ -641,7 +641,7 @@ select * from test where id=1;
 执行器将上述遍历过程中所有满足条件的行组成的记录集作为结果集返回给客户端。
 ```
 
-##### 小结
+#### 小结
 
 至此，这个语句就执行完成了。对于有索引的表，执行的逻辑也差不多。
 
@@ -649,9 +649,9 @@ SQL 语句在 MySQL 中的流程是： `SQL语句`→`查询缓存`→`解析器
 
 [![image-20220615164722975](image/MySQL(2)架构篇.assets/image-20220615164722975.png)](https://github.com/codinglin/StudyNotes/blob/main/MySQL高级篇/MySQL架构篇.assets/image-20220615164722975.png)
 
-#### 2.2 验证MySQL中SQL执行流程
+### 2.2 验证MySQL中SQL执行流程
 
-##### 1) MySQL8.0中
+#### 1) MySQL8.0中
 
 1) 确认profiling是否开启
 
@@ -763,7 +763,7 @@ type: {
 
 `在 8.0 版本之后，MySQL 不再支持缓存的查询`。一旦数据表有更新，缓存都将清空，因此只有数据表是静态的时候，或者数据表很少发生变化时，使用缓存查询才有价值，否则如果数据表经常更新，反而增加了 SQL 的查询时间。
 
-##### 2) MySQL5.7中
+#### 2) MySQL5.7中
 
 上述操作在MySQL5.7中测试，发现前后两次相同的sql语句，执行的查询过程仍然是相同的。不是会使用 缓存吗？这里我们需要 显式开启查询缓存模式 。在MySQL5.7中如下设置：
 
@@ -831,7 +831,7 @@ mysql> show profile for query 2;
 
 
 
-#### 2.3 SQL语法顺序
+### 2.3 SQL语法顺序
 
 随着Mysql版本的更新换代，其优化器也在不断的升级，优化器会分析不同执行顺序产生的性能消耗不同 而动态调整执行顺序。
 
@@ -839,7 +839,7 @@ mysql> show profile for query 2;
 
 
 
-### 3. 数据库缓冲池（buffer pool）
+## 3. 数据库缓冲池（buffer pool）
 
 `InnoDB` 存储引擎是**以页为单位**来管理存储空间的，我们进行的增删改查操作其实本质上都是在访问页面（包括读页面、写页面、创建新页面等操作）。而磁盘 I/O 需要消耗的时间很多，而在内存中进行操作，效率则会高很多，为了能让数据表或者索引中的数据随时被我们所用，DBMS 会申请`占用内存来作为数据缓冲池` ，**在真正访问页面之前，需要把在磁盘上的页缓存到内存中的 Buffer Pool 之后才可以访问。**
 
@@ -847,11 +847,11 @@ mysql> show profile for query 2;
 
 > MySQL数据页的大小默认是16KB，操作系统的默认大小是4KB
 
-#### 3.1 缓冲池 vs 查询缓存
+### 3.1 缓冲池 vs 查询缓存
 
 缓冲池和查询缓存是一个东西吗？不是。
 
-##### 1) 缓冲池（Buffer Pool）
+#### 1) 缓冲池（Buffer Pool）
 
 首先我们需要了解在 InnoDB 存储引擎中，缓冲池都包括了哪些。
 
@@ -877,7 +877,7 @@ InnoDB存储引擎在处理客户端的请求时，当需要访问某个页的�
 
 缓冲池的作用就是提升 I/O 效率，而我们进行读取数据的时候存在一个“局部性原理”，也就是说我们使用了一些数据，`大概率还会使用它周围的一些数据`，因此采用“预读”的机制提前加载，可以减少未来可能的磁盘 I/O 操作。
 
-##### 2) 查询缓存
+#### 2) 查询缓存
 
 那么什么是查询缓存呢？
 
@@ -885,7 +885,7 @@ InnoDB存储引擎在处理客户端的请求时，当需要访问某个页的�
 
 
 
-#### 3.2 缓冲池如何读取数据
+### 3.2 缓冲池如何读取数据
 
 缓冲池管理器会尽量将经常使用的数据保存起来，在数据库进行页面读操作的时候，首先会判断该页面 是否在缓冲池中，如果存在就直接读取，如果不存在，就会通过内存或磁盘将页面存放到缓冲池中再进行读取。
 
@@ -901,7 +901,7 @@ InnoDB存储引擎在处理客户端的请求时，当需要访问某个页的�
 
 
 
-#### 3.3 查看/设置缓冲池的大小
+### 3.3 查看/设置缓冲池的大小
 
 如果你使用的是 MySQL MyISAM 存储引擎，它只缓存索引，不缓存数据，对应的键缓存参数为`key_buffer_size`，你可以用它进行查看。
 
@@ -932,7 +932,7 @@ innodb_buffer_pool_size = 268435456
 
 
 
-#### 3.4 多个Buffer Pool实例
+### 3.4 多个Buffer Pool实例
 
 Buffer Poolz本质是InnoDB向操作系统申请的一块`连续的内存空间`，在多线程环境下，方问Buffer Pool中的数据都需要`加锁`处理。在Buffer Pool特别大而且**多线程并发访问特别高**的情况下，单一的Buffer Pool可能会影响请求的处理速度。所以在Buffer Pool特别大的时候，我们可以把它们`拆分成若干个小的Buffer Pool`,每个BufferPool都称为一个实例，它们都是独立的，独立的去申请内存空间，独立的管理各种链表。**所以在多线程并发访问时并不会相互影响，从而提高并发处理能力。**
 
@@ -969,7 +969,7 @@ innodb_buffer_pool_size/innodb_buffer_pool_instances
 
 
 
-#### 3.5 引申问题
+### 3.5 引申问题
 
 Buffer Pool是MySQL内存结构中十分核心的一个组成，你可以先把它想象成一个黑盒子。
 
@@ -983,13 +983,13 @@ Buffer Pool是MySQL内存结构中十分核心的一个组成，你可以先把�
 
 答案：**Redo Log** & **Undo Log**
 
-## 存储引擎概述
+# 存储引擎概述
 
 - 为了管理方便，人们把`连接管理`、`查询缓存`、`语法解析`、`查询优化`这些并不涉及真实数据存储的功能划分为MySQL server的功能，
 - 把真实存取数据的功能划分为`存储引擎`的功能。所以在`MySQL server`完成了查询优化后，只需按照生成的`执行计划`调用底层存储引擎提供的API,获取到数据后返回给客户端就好了。
 - MySQL中提到了存储引擎的概念。简而言之，`存储引擎就是指表的类型`。其实存储引擎以前叫做**`表处理器`**，后来改名为`存储引擎`，它的功能就是接收上层传下来的指令，然后对表中的数据进行提取或写入操作。
 
-### 1. 查看存储引擎
+## 1. 查看存储引擎
 
 - 查看mysql提供什么存储引擎
 
@@ -1001,13 +1001,13 @@ show engines;
 
 > 只有InnoDB支持事务、分布式事务（XA）、savepoints
 
-### 2. 设置系统默认的存储引擎
+## 2. 设置系统默认的存储引擎
 
 - 查看默认的存储引擎
 
 ```
 show variables like '%storage_engine%';
-#或
+或
 SELECT @@default_storage_engine;
 ```
 
@@ -1029,17 +1029,17 @@ SET DEFAULT_STORAGE_ENGINE=MyISAM;
 
 ```
 default-storage-engine=MyISAM
-# 重启服务
+ 重启服务
 systemctl restart mysqld.service
 ```
 
 
 
-### 3. 设置表的存储引擎
+## 3. 设置表的存储引擎
 
 存储引擎是负责对表中的数据进行提取和写入工作的，我们可以为 不同的表设置不同的存储引擎 ，也就是 说不同的表可以有不同的物理存储结构，不同的提取和写入方式。
 
-#### 3.1 创建表时指定存储引擎
+### 3.1 创建表时指定存储引擎
 
 我们之前创建表的语句都没有指定表的存储引擎，那就会使用默认的存储引擎 InnoDB 。如果我们想显 式的指定一下表的存储引擎，那可以这么写：
 
@@ -1051,7 +1051,7 @@ CREATE TABLE 表名(
 
 
 
-#### 3.2 修改表的存储引擎
+### 3.2 修改表的存储引擎
 
 如果表已经建好了，我们也可以使用下边这个语句来修改表的存储引擎：
 
@@ -1083,9 +1083,9 @@ Create Table: CREATE TABLE `engine_demo_table` (
 
 
 
-### 4. 引擎介绍
+## 4. 引擎介绍
 
-#### 4.1 InnoDB 引擎：具备外键支持功能的事务存储引擎
+### 4.1 InnoDB 引擎：具备外键支持功能的事务存储引擎
 
 - MySQL从3.23.34a开始就包含InnoDB存储引擎。 `大于等于5.5之后，默认采用InnoDB引擎` 。
 
@@ -1110,7 +1110,7 @@ Create Table: CREATE TABLE `engine_demo_table` (
 
 - `支持行锁、事务、外键`
 
-#### 4.2 MyISAM 引擎：主要的非事务处理存储引擎
+### 4.2 MyISAM 引擎：主要的非事务处理存储引擎
 
 - MyISAM提供了大量的特性，包括全文索引、压缩、空间函数(GIS)等，但MyISAM`不支持事务、行级锁、外键` ，有一个毫无疑问的缺陷就是`崩溃后无法安全恢复 `。
 - `5.5之前默认的存储引擎`
@@ -1121,7 +1121,7 @@ Create Table: CREATE TABLE `engine_demo_table` (
   - 表名.MYI 存储索引 (MYIndex)
 - 应用场景：只读应用或者以读为主的业务
 
-#### 4.3 Archive 引擎：用于数据存档
+### 4.3 Archive 引擎：用于数据存档
 
 - `archive`是`归档`的意思，仅仅支持`插入`和`查询`两种功能（行插入后不能被修改）。
 - 在MySQL5.5以后`支持索引`功能
@@ -1135,12 +1135,12 @@ Create Table: CREATE TABLE `engine_demo_table` (
 
 [![image-20220616124743732](image/MySQL(2)架构篇.assets/image-20220616124743732.png)](https://github.com/codinglin/StudyNotes/blob/main/MySQL高级篇/MySQL架构篇.assets/image-20220616124743732.png)
 
-#### 4.4 Blackhole 引擎：丢弃写操作，读操作会返回空内容
+### 4.4 Blackhole 引擎：丢弃写操作，读操作会返回空内容
 
 - Blackhole引擎没有实现任何存储机制，它会`丢弃所有插入的数据`，不做任何保存。
 - 但服务器会记录Blackhole表的日志，所以可以用于复制数据到备库，或者简单地记录到目志。但这种应用方式会碰到很多问题，**因此并不推荐。**
 
-#### 4.5 CSV 引擎：存储数据时，以逗号分隔各个数据项
+### 4.5 CSV 引擎：存储数据时，以逗号分隔各个数据项
 
 - CSV引擎可以将`普通的CSV文件作为MySQL的表来处理`，但不支持索引。
 - CSV引擎可以作为一种`数据交换的机制`，非常有用。
@@ -1188,7 +1188,7 @@ mysql> SELECT * FROM test;
 
 
 
-#### 4.6 Memory 引擎：置于内存的表
+### 4.6 Memory 引擎：置于内存的表
 
 **概述：**
 
@@ -1217,18 +1217,18 @@ Memory采用的逻辑介质是`内存 ，响应速度很快` ，但是当mysqld�
 
 
 
-#### 4.7 Federated 引擎：访问远程表
+### 4.7 Federated 引擎：访问远程表
 
 - Federated引擎是访问其他MySQL服务器的一个 `代理` ，尽管该引擎看起来提供了一种很好的 `跨服务 器的灵活性` ，但也经常带来问题，因此 `默认是禁用的` 。
 
 
-#### 4.8 Merge引擎：管理多个MyISAM表构成的表集合
+### 4.8 Merge引擎：管理多个MyISAM表构成的表集合
 
-#### 4.9 NDB引擎：MySQL集群专用存储引擎
+### 4.9 NDB引擎：MySQL集群专用存储引擎
 
 也叫做 NDB Cluster 存储引擎，主要用于 `MySQL Cluster 分布式集群` 环境，类似于 Oracle 的 RAC 集 群。
 
-#### 4.10 引擎对比
+### 4.10 引擎对比
 
 MySQL中同一个数据库，不同的表可以选择不同的存储引擎。如下表对常用存储引擎做出了对比。
 
@@ -1240,7 +1240,7 @@ MySQL中同一个数据库，不同的表可以选择不同的存储引擎。如
 
 其实我们最常用的就是 InnoDB 和 MyISAM ，有时会提一下 Memory 。其中 InnoDB 是 MySQL 默认的存储引擎。
 
-### 5. MyISAM和InnoDB对比汇总
+## 5. MyISAM和InnoDB对比汇总
 
 很多人对 InnoDB 和 MyISAM 的取舍存在疑问，到底选择哪个比较好呢？	
 
