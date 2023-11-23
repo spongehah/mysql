@@ -4720,6 +4720,9 @@ EXPLAIN SELECT SQL_NO_CACHE * FROM student WHERE student.age=30 AND student.name
 ```
 
 > 应用开发中范围查询，例如：金额查询，日期查询往往都是范围查询。应将查询条件放置where语句最后。（**<font color='red'>创建的联合索引中，务必把范围涉及到的字段写在最后</font>**）
+>
+> 注意：根据JavaGuide中指出，范围查询不一定会使之后的索引列失效，在执行过程中遇到范围查询（如 **`>`**、**`<`** ）才会停止匹配。对于 **`>=`**、**`<=`**、**`BETWEEN`**、**`like`** 前缀匹配的范围查询，并不会停止匹配，因为对于包含边界的范围查询来说，可以利用后面的索引列对边界的那个值进行过滤
+> 链接：https://mp.weixin.qq.com/s/8qemhRg5MgXs1So5YCv0fQ
 
 3. 效果
 
@@ -4919,9 +4922,11 @@ mysql> select d.* from tradelog l , trade_detail d where d.tradeid=CONVERT(l.tra
 
 
 
+### 2.14 in和not in的范围太大可能导致全表扫描
 
 
-### 2.14	 练习及一般性建议
+
+### 2.15 练习及一般性建议
 
 **练习：**假设：index(a,b,c)
 
