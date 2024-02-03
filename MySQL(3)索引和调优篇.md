@@ -4184,6 +4184,20 @@ from sys.innodb_buffer_stats_by_table order by allocated limit 10;
 select * from sys.statements_with_full_table_scans where db='dbname';
 ```
 
+**查询数据库中表的内存使用情况：**
+
+```sql
+select
+table_schema as '数据库',
+table_name as '表名',
+table_rows as '记录数',
+truncate(data_length/1024/1024, 2) as '数据容量(MB)',
+truncate(index_length/1024/1024, 2) as '索引容量(MB)'
+from information_schema.tables
+where table_schema='qiyu_live_user'
+order by data_length desc, index_length desc;
+```
+
 语句相关
 
 ```mysql
@@ -4721,7 +4735,7 @@ EXPLAIN SELECT SQL_NO_CACHE * FROM student WHERE student.age=30 AND student.name
 
 > 应用开发中范围查询，例如：金额查询，日期查询往往都是范围查询。应将查询条件放置where语句最后。（**<font color='red'>创建的联合索引中，务必把范围涉及到的字段写在最后</font>**）
 >
-> 注意：根据JavaGuide中指出，范围查询不一定会使之后的索引列失效，在执行过程中遇到范围查询（如 **`>`**、**`<`** ）才会停止匹配。对于 **`>=`**、**`<=`**、**`BETWEEN`**、**`like`** 前缀匹配的范围查询，并不会停止匹配，因为对于包含边界的范围查询来说，可以利用后面的索引列对边界的那个值进行过滤
+> 注意：根据JavaGuide中指出，范围查询不一定会使之后的索引列失效，在执行过程中遇到范围查询（如 **`>`**、**`<`** ）才会停止匹配。对于 **`>=`**、**`<=`**、**`BETWEEN`**、**`like`** 前缀匹配的范围查询，并不会停止匹配，因为对于包含边界的范围查询来说，等值边界位置上的后续索引的值是有序的
 > 链接：https://mp.weixin.qq.com/s/8qemhRg5MgXs1So5YCv0fQ
 
 3. 效果
@@ -5006,6 +5020,12 @@ INSERT INTO book(card) VALUES(FLOOR(1 + (RAND() * 20)));
 
 ### 3.2 采用左外连接
 
+> ![image-20240203183715801](image/MySQL(3)索引和调优篇.assets/image-20240203183715801.png)
+>
+> 先搞懂外连接是，驱动表全要，然后再去匹配被驱动表中符合条件的
+>
+> 注意：**连接查询在EXPLAIN结果中，上面的是驱动表，下面的是被驱动表，驱动表先执行**
+
 下面开始 EXPLAIN 分析
 
 ```mysql
@@ -5047,6 +5067,12 @@ EXPLAIN SELECT SQL_NO_CACHE * FROM `type` LEFT JOIN book ON type.card = book.car
 
 ### 3.3 采用内连接
 
+> ![image-20240203183954011](image/MySQL(3)索引和调优篇.assets/image-20240203183954011.png)
+>
+> 先搞懂内连接是，驱动表和被驱动表都只要满足连接条件的，
+>
+> 但是，也是在优化器选出驱动表后，**驱动表进行全表遍历**，再去被驱动表进行比对，比对成功才放入结果集
+
 ```mysql
 drop index X on type;
 drop index Y on book;（如果已经删除了可以不用再执行该操作）
@@ -5078,52 +5104,51 @@ EXPLAIN SELECT SQL_NO_CACHE * FROM type INNER JOIN book ON type.card=book.card;
 
 对于内连接来说，查询优化器可以决定谁作为驱动表，谁作为被驱动表出现的
 
-> **<font color='red'>对于内连接，若只有一个表有索引，因为两个表属于同级，那么优化器会选择拥有索引的表作为驱动表</font>**
+> **<font color='red'>对于内连接，若只有一个表有索引，因为两个表属于同级，那么优化器会选择拥有索引的表作为被驱动表</font>**
 
 接着：
 
 ```mysql
-DROP INDEX X ON `type`;
+DROP INDEX Y ON `book`;
 EXPLAIN SELECT SQL_NO_CACHE * FROM TYPE INNER JOIN book ON type.card=book.card;
 ```
 
-![image-20220705161929544](image/MySQL(3)索引和调优篇.assets/image-20220705161929544.png)
+![image-20240203183320552](image/MySQL(3)索引和调优篇.assets/image-20240203183320552.png)
 
 接着：
 
 ```mysql
-ALTER TABLE `type` ADD INDEX X (card);
+ALTER TABLE `book` ADD INDEX Y (card);
 EXPLAIN SELECT SQL_NO_CACHE * FROM `type` INNER JOIN book ON type.card=book.card;
 ```
 
-![image-20220705162009145](image/MySQL(3)索引和调优篇.assets/image-20220705162009145.png)
+![image-20240203184316552](image/MySQL(3)索引和调优篇.assets/image-20240203184316552.png)
 
 接着：
 
 ```mysql
 #向图书表中添加20条记录
-INSERT INTO book(card) VALUES(FLOOR(1 + (RAND() * 20)));
-INSERT INTO book(card) VALUES(FLOOR(1 + (RAND() * 20)));
-INSERT INTO book(card) VALUES(FLOOR(1 + (RAND() * 20)));
-INSERT INTO book(card) VALUES(FLOOR(1 + (RAND() * 20)));
-INSERT INTO book(card) VALUES(FLOOR(1 + (RAND() * 20)));
-INSERT INTO book(card) VALUES(FLOOR(1 + (RAND() * 20)));
-INSERT INTO book(card) VALUES(FLOOR(1 + (RAND() * 20)));
-INSERT INTO book(card) VALUES(FLOOR(1 + (RAND() * 20)));
-INSERT INTO book(card) VALUES(FLOOR(1 + (RAND() * 20)));
-INSERT INTO book(card) VALUES(FLOOR(1 + (RAND() * 20)));
-INSERT INTO book(card) VALUES(FLOOR(1 + (RAND() * 20)));
-INSERT INTO book(card) VALUES(FLOOR(1 + (RAND() * 20)));
-INSERT INTO book(card) VALUES(FLOOR(1 + (RAND() * 20)));
-INSERT INTO book(card) VALUES(FLOOR(1 + (RAND() * 20)));
-INSERT INTO book(card) VALUES(FLOOR(1 + (RAND() * 20)));
-INSERT INTO book(card) VALUES(FLOOR(1 + (RAND() * 20)));
-INSERT INTO book(card) VALUES(FLOOR(1 + (RAND() * 20)));
-INSERT INTO book(card) VALUES(FLOOR(1 + (RAND() * 20)));
-INSERT INTO book(card) VALUES(FLOOR(1 + (RAND() * 20)));
-INSERT INTO book(card) VALUES(FLOOR(1 + (RAND() * 20)));
+INSERT INTO type(card) VALUES(FLOOR(1 + (RAND() * 20)));
+INSERT INTO type(card) VALUES(FLOOR(1 + (RAND() * 20)));
+INSERT INTO type(card) VALUES(FLOOR(1 + (RAND() * 20)));
+INSERT INTO type(card) VALUES(FLOOR(1 + (RAND() * 20)));
+INSERT INTO type(card) VALUES(FLOOR(1 + (RAND() * 20)));
+INSERT INTO type(card) VALUES(FLOOR(1 + (RAND() * 20)));
+INSERT INTO type(card) VALUES(FLOOR(1 + (RAND() * 20)));
+INSERT INTO type(card) VALUES(FLOOR(1 + (RAND() * 20)));
+INSERT INTO type(card) VALUES(FLOOR(1 + (RAND() * 20)));
+INSERT INTO type(card) VALUES(FLOOR(1 + (RAND() * 20)));
+INSERT INTO type(card) VALUES(FLOOR(1 + (RAND() * 20)));
+INSERT INTO type(card) VALUES(FLOOR(1 + (RAND() * 20)));
+INSERT INTO type(card) VALUES(FLOOR(1 + (RAND() * 20)));
+INSERT INTO type(card) VALUES(FLOOR(1 + (RAND() * 20)));
+INSERT INTO type(card) VALUES(FLOOR(1 + (RAND() * 20)));
+INSERT INTO type(card) VALUES(FLOOR(1 + (RAND() * 20)));
+INSERT INTO type(card) VALUES(FLOOR(1 + (RAND() * 20)));
+INSERT INTO type(card) VALUES(FLOOR(1 + (RAND() * 20)));
+INSERT INTO type(card) VALUES(FLOOR(1 + (RAND() * 20)));
+INSERT INTO type(card) VALUES(FLOOR(1 + (RAND() * 20)));
 
-ALTER TABLE book ADD INDEX Y (card);
 EXPLAIN SELECT SQL_NO_CACHE * FROM `type` INNER JOIN book ON `type`.card = book.card;
 ```
 
@@ -5134,6 +5159,8 @@ EXPLAIN SELECT SQL_NO_CACHE * FROM `type` INNER JOIN book ON `type`.card = book.
 > **<font color='red'>对于内连接：若都有索引，则优化器会选择数据量大的表作为被驱动表，“小表驱动大表”</font>**
 >
 > 更准确来讲是**小的结果集驱动大的结果集**，详情看3.4 > 5，不止是根据行数决定，根据sql语句的执行顺序，行数应该是where语句过滤过后的行数，结果集的大小还与要查询的字段数和数据量有关
+>
+> 若只有一个表有索引，`可以使用被驱动表的索引时`，小表驱动大表，若被驱动表的索引不能使用时，使用有索引的表作为驱动表，因为驱动表的行数影响更大
 
 ### 3.4 join语句原理
 
@@ -5171,7 +5198,7 @@ INSERT INTO b VALUES(3,3),(4,4),(5,5),(6,6),(7,7),(8,8);
 SELECT * FROM b;
 
 # 测试1
-EXPLAIN SELECT * FROM a LEFT JOIN b ON(a.f1=b.f1) WHERE (a.f2=b.f2);
+EXPLAIN SELECT * FROM a LEFT JOIN b ON(a.f1=b.f1) WHERE (a.f2=b.f2);#a不一定是驱动表，优化器优化成了内连接
 
 # 测试2
 EXPLAIN SELECT * FROM a LEFT JOIN b ON(a.f1=b.f1) AND (a.f2=b.f2);
@@ -5187,6 +5214,8 @@ EXPLAIN SELECT * FROM a LEFT JOIN b ON(a.f1=b.f1) AND (a.f2=b.f2);
 
 ![image-20220705165646252](image/MySQL(3)索引和调优篇.assets/image-20220705165646252.png)
 
+> 读取记录数A+BA = A(B+1)，所以A越小越后，A是驱动表的记录数
+
 当然mysql肯定不会这么粗暴的去进行表的连接，所以就出现了后面的两种对Nested-Loop Join优化算法。
 
 #### 3. Index Nested-Loop Join （索引嵌套循环连接）
@@ -5199,6 +5228,8 @@ Index Nested-Loop Join其优化的思路主要是为了`减少内存表数据的
 
 ![image-20220705172650749](image/MySQL(3)索引和调优篇.assets/image-20220705172650749.png)
 
+> INLJ的内表扫描次数为0是指全表扫描次数为0，因为是扫描的索引树
+
 如果被驱动表加索引，效率是非常高的，但如果索引不是主键索引，所以还得进行一次回表查询。相比，被驱动表的索引是主键索引，效率会更高。
 
 #### 4. Block Nested-Loop Join（块嵌套循环连接）
@@ -5209,11 +5240,13 @@ Index Nested-Loop Join其优化的思路主要是为了`减少内存表数据的
 >
 > 这里缓存的不只是关联表的列，select后面的列也会缓存起来。
 >
-> 在一个有N个join关联的sql中会分配N-1个join buffer。所以查询的时候尽量减少不必要的字段，可以让join buffer中可以存放更多的列。
+> 在一个有N个join关联的sql中会分配N-1个join buffer。所以**查询的时候尽量减少不必要的字段**，可以让join buffer中可以存放更多的列。
 
 ![image-20220705174005280](image/MySQL(3)索引和调优篇.assets/image-20220705174005280.png)
 
 ![image-20220705174250551](image/MySQL(3)索引和调优篇.assets/image-20220705174250551.png)
+
+> JOIN比较次数和SNLJ是一样的，只不过BNLJ是将驱动表要查询的数据缓存到join buffer中在内存中进行比较，内存操作会快很多
 
 参数设置：
 
@@ -5233,13 +5266,20 @@ join_buffer_size的最大值在32位操作系统可以申请4G，而在64位操�
 
 #### 5. Join小结
 
+> 根据《MySQL实战45讲》中，可以开启**MRR**功能优化回表，大致思路就是，使用一个buffer将二级索引缓存起来并排好序再去回表就是顺序IO；
+>
+> 而我们可以使用**BKA算法优化INLJ和BNLJ**，思路就是基于MRR的，详情请看《MySQL实战45将》第34讲
+
 1、**整体效率比较：INLJ > BNLJ > SNLJ**
 
-2、永远用`小结果集驱动大结果集`（其本质就是减少外层循环的数据数量）（小的度量单位指的是表行数 * 每行大小）
+2、永远用`小结果集驱动大结果集`（其本质就是减少外层循环的数据数量，结果集大小判定：表行数 × 每行大小）
+
+如果某个表带上where条件，如A表由100行数据，B表有1000行数据，但是B带上了where xxx<50，所以应该B表才是小表
 
 ```mysql
-select t1.b,t2.* from t1 straight_join t2 on (t1.b=t2.b) where t2.id<=100; # 推荐
-select t1.b,t2.* from t2 straight_join t1 on (t1.b=t2.b) where t2.id<=100; # 不推荐
+select t1.b,t2.* from t1 straight_join t2 on (t1.b=t2.b); # 推荐
+select t1.b,t2.* from t2 straight_join t1 on (t1.b=t2.b); # 不推荐
+# 因为t1只查询b字段，join buffer中可以放的数据更多
 ```
 
 3、为被驱动表匹配的条件增加索引(减少内存表的循环匹配次数)
@@ -5247,8 +5287,6 @@ select t1.b,t2.* from t2 straight_join t1 on (t1.b=t2.b) where t2.id<=100; # 不
 4、增大join buffer size的大小（一次索引的数据越多，那么内层包的扫描次数就越少）
 
 5、减少驱动表不必要的字段查询（字段越少，join buffer所缓存的数据就越多）
-
-
 
 #### 6. Hash Join
 
@@ -5889,13 +5927,11 @@ select id from test where k=5;
 
 `唯一索引的更新就不能使用change buffer` ，实际上也只有普通索引可以使用。
 
-如果要在这张表中插入一个新记录(4,400)的话，InnoDB的处理流程是怎样的？
-
 ### 11.3 change buffer的使用场景
 
 1. 普通索引和唯一索引应该怎么选择？其实，这两类索引在查询能力上是没差别的，主要考虑的是 对 更新性能 的影响。所以，建议你 **尽量选择普通索引** 。 
 2. 在实际使用中会发现， 普通索引 和 change buffer 的配合使用，对于 数据量大 的表的更新优化 还是很明显的。 
-3. 如果所有的更新后面，都马上 `伴随着对这个记录的查询` ，那么你应该 `关闭change buffer` 。而在 其他情况下，change buffer都能提升更新性能。 
+3. 如果所有的更新后面，都马上 `伴随着对这个记录的查询`（删改查都会有查询操作） ，那么你应该 `关闭change buffer` 。而在 其他情况下，change buffer都能提升更新性能。 
 4. 由于**唯一索引用不上change buffer的优化机制**，因此如果业务可以接受，从性能角度出发建议优先考虑非唯一索引。但是如果"业务可能无法确保"的情况下，怎么处理呢？ 
    * 首先， 业务正确性优先 。我们的前提是“业务代码已经保证不会写入重复数据”的情况下，讨论性能 问题。如果业务不能保证，或者业务就是要求数据库来做约束，那么没得选，必须创建唯一索引。 这种情况下，本节的意义在于，如果碰上了大量插入数据慢、内存命中率低的时候，给你多提供一 个排查思路。 
    * 然后，在一些“ 归档库 ”的场景，你是可以考虑使用唯一索引的。比如，线上数据只需要保留半年， 然后历史数据保存在归档库。这时候，归档数据已经是确保没有唯一键冲突了。要提高归档效率， 可以考虑把表里面的唯一索引改成普通索引。

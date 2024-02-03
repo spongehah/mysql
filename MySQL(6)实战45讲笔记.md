@@ -1,5 +1,3 @@
-[TOC]
-
 # MySQL实战45讲
 
 > 主要参考：
@@ -7,6 +5,8 @@
 > - MySQL实战45讲	作者：林晓斌（丁奇）
 > - 极客时间：https://time.geekbang.org/column/intro/100020801
 > - 参考资源：https://funnylog.gitee.io/mysql45/
+
+[TOC]
 
 # 01 讲基础架构：一条SQL查询语句是如何执行的
 
