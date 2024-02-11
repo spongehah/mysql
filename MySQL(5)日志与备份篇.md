@@ -1225,6 +1225,8 @@ flush privileges;
 查询Master的状态，并记录下File和Position的值。
 
 ```mysql
+show variables like 'server_id';
+set global server_id = 1;
 show master status;
 ```
 
@@ -1267,6 +1269,8 @@ CHANGE MASTER TO MASTER_HOST='192.168.111.100',MASTER_USER='slave1',MASTER_PASSW
 **步骤2：**
 
 ```mysql
+show variables like 'server_id';
+set global server_id = 2;
 #启动slave同步
 START SLAVE;
 ```
